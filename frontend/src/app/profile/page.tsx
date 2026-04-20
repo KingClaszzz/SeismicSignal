@@ -15,6 +15,9 @@ const ERC20_ABI = [
 ] as const;
 
 const ARSEI_ADDRESS = (process.env.NEXT_PUBLIC_ARSEI_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:4000" : "https://arlor-seis.hf.space");
 
 const TOKEN_CONFIG: Record<string, { color: string; bgSent: string; bgReceived: string; label: string }> = {
   ETH: {
@@ -93,7 +96,7 @@ export default function ProfilePage() {
     if (!address) return;
     try {
       setLoading(true);
-      const backendUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/user`;
+      const backendUrl = `${API_BASE}/api/user`;
       const [historyRes, nftRes] = await Promise.allSettled([
         axios.get(`${backendUrl}/${address}/history`),
         axios.get(`${backendUrl}/${address}/nfts`),

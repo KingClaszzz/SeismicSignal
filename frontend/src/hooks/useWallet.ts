@@ -7,7 +7,10 @@ import { ensureCsrfToken, updateCsrfToken } from "@/lib/csrf";
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:4000" : "https://arlor-seis.hf.space");
+const API_URL = `${API_BASE}/api`;
 const MANUAL_DISCONNECT_KEY = "seismic_signal_manual_disconnect";
 const ADMIN_WALLET_ADDRESS = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase() || null;
 axios.defaults.withCredentials = true;

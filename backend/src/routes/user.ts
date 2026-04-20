@@ -179,8 +179,24 @@ async function getExplorer(url: string) {
   return response.data;
 }
 
-async function getExplorerTokenList(address: string) {
-  return getExplorer(`${EXPLORER_API}?module=account&action=tokenlist&address=${address}`);
+async function getExplorerTokenBalances(address: string) {
+  return getExplorer(`${EXPLORER_API}?module=account&action=addresstokenbalance&address=${address}`);
+}
+
+async function getExplorerNftBalances(address: string) {
+  return getExplorer(`${EXPLORER_API}?module=account&action=addresstokennftbalance&address=${address}`);
+}
+
+function isExplorerSuccess(response: any) {
+  const status = String(response?.status ?? "");
+  return status === "1" || response?.message === "OK";
+}
+
+function asArrayResult(response: any) {
+  if (Array.isArray(response?.result)) return response.result;
+  if (Array.isArray(response?.result?.items)) return response.result.items;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
 }
 
 async function getExplorerNativeTxs(address: string) {
@@ -279,10 +295,11 @@ router.get("/:address/nfts", walletDataLimiter, async (req, res) => {
     if (!isAddress(address)) {
       return res.status(400).json({ success: false, message: "Invalid wallet address." });
     }
-    const response = await getExplorerTokenList(address);
+    const response = await getExplorerNftBalances(address);
 
-    if (response.status === "1") {
-      const nfts = response.result.filter((token: any) => token.type === "ERC-721" || token.type === "ERC-1155");
+    if (isExplorerSuccess(response)) {
+      const items = asArrayResult(response);
+      const nfts = items.filter((token: any) => token.type === "ERC-721" || token.type === "ERC-1155");
       res.json({ success: true, data: nfts });
       return;
     }
@@ -300,10 +317,10 @@ router.get("/:address/tokens", walletDataLimiter, async (req, res) => {
     if (!isAddress(address)) {
       return res.status(400).json({ success: false, message: "Invalid wallet address." });
     }
-    const response = await getExplorerTokenList(address);
+    const response = await getExplorerTokenBalances(address);
 
-    if (response.status === "1") {
-      res.json({ success: true, data: getTokenItems(response.result) });
+    if (isExplorerSuccess(response)) {
+      res.json({ success: true, data: getTokenItems(asArrayResult(response)) });
       return;
     }
 
@@ -352,7 +369,7 @@ router.post("/agent/chat", chatLimiter, async (req, res) => {
       try {
         const [nativeBalance, tokenRes, nativeTxRes, tokenTxRes] = await Promise.allSettled([
           publicClient.getBalance({ address: verifiedAddress as `0x${string}` }),
-          getExplorerTokenList(verifiedAddress),
+          getExplorerTokenBalances(verifiedAddress),
           getExplorerNativeTxs(verifiedAddress),
           getExplorerTokenTxs(verifiedAddress),
         ]);
@@ -363,8 +380,8 @@ router.post("/agent/chat", chatLimiter, async (req, res) => {
           balances.push(`ETH: ${Number(formatEther(nativeBalance.value)).toFixed(4)}`);
         }
 
-        if (tokenRes.status === "fulfilled" && tokenRes.value.status === "1") {
-          getTokenItems(tokenRes.value.result).forEach((token: any) => {
+        if (tokenRes.status === "fulfilled" && isExplorerSuccess(tokenRes.value)) {
+          getTokenItems(asArrayResult(tokenRes.value)).forEach((token: any) => {
             const symbol = String(token.symbol || "").toUpperCase();
             const decimals = Number(token.decimals || 18);
             const amount = (Number(token.balance) / 10 ** decimals).toFixed(4);
