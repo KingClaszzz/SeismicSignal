@@ -9,9 +9,6 @@
     "seed": "npx ts-node prisma/seed.ts",
     "manage": "npx ts-node src/manage.ts"
   },
-  "prisma": {
-    "seed": "npx ts-node prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "axios": "^1.13.6",
