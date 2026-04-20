@@ -111,4 +111,4 @@ The contracts include:
 - intent registry
 - AMM router stack
 
-Build by Arlor09
+Build by Arlor.
