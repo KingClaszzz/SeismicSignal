@@ -48,6 +48,7 @@ export function useWallet() {
 
   const [sessionAddress, setSessionAddress] = useState<string | null>(globalSessionAddress);
   const [isAuthFetched, setIsAuthFetched] = useState(false);
+  const [fallbackNativeBalance, setFallbackNativeBalance] = useState<string | null>(null);
 
   const { data: balance, error: balanceError } = useBalance({
     address,
@@ -56,6 +57,18 @@ export function useWallet() {
       retry: 1,
     },
   });
+
+  useEffect(() => {
+    if (address && sessionAddress && (!balance || balanceError)) {
+      axios.get(`${API_URL}/user/${address}/native-balance`)
+        .then(res => {
+          if (res.data?.success) {
+            setFallbackNativeBalance(res.data.data.formatted);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [address, sessionAddress, balance, balanceError]);
 
   const { signMessageAsync } = useSignMessage();
 
@@ -181,6 +194,8 @@ export function useWallet() {
 
   const formattedBalance = balance
     ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}`
+    : fallbackNativeBalance
+    ? fallbackNativeBalance
     : balanceError
     ? "--- ETH"
     : null;
