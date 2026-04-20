@@ -67,6 +67,20 @@ function formatAmount(tx: any): string {
   }
 }
 
+function formatRawBalance(rawValue: string, decimalsValue: string): string {
+  try {
+    const decimals = Math.max(0, Number(decimalsValue || "18"));
+    const raw = BigInt(rawValue || "0");
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const whole = raw / divisor;
+    const fraction = raw % divisor;
+    const fractionStr = decimals > 0 ? fraction.toString().padStart(decimals, "0").slice(0, 4) : "0000";
+    return `${whole}.${fractionStr}`;
+  } catch {
+    return "0.0000";
+  }
+}
+
 export default function ProfilePage() {
   const { address, balance, isLoggedIn, prepareForConnect } = useWallet();
   const mounted = useIsMounted();
@@ -97,13 +111,26 @@ export default function ProfilePage() {
     try {
       setLoading(true);
       const backendUrl = `${API_BASE}/api/user`;
-      const [historyRes, nftRes] = await Promise.allSettled([
+      const [historyRes, nftRes, tokenRes] = await Promise.allSettled([
         axios.get(`${backendUrl}/${address}/history`),
         axios.get(`${backendUrl}/${address}/nfts`),
+        axios.get(`${backendUrl}/${address}/tokens`),
       ]);
 
       if (historyRes.status === "fulfilled" && historyRes.value.data.success) setHistory(historyRes.value.data.data);
       if (nftRes.status === "fulfilled" && nftRes.value.data.success) setNfts(nftRes.value.data.data);
+      if (tokenRes.status === "fulfilled" && tokenRes.value.data.success && Array.isArray(tokenRes.value.data.data)) {
+        const arsei = tokenRes.value.data.data.find((token: any) => {
+          const symbol = String(token.symbol || token.tokenSymbol || token.TokenSymbol || "").toUpperCase();
+          return symbol === "ARSEI";
+        });
+
+        if (arsei) {
+          const raw = String(arsei.balance || arsei.TokenQuantity || "0");
+          const decimals = String(arsei.tokenDecimal || arsei.TokenDecimals || arsei.decimals || "18");
+          setArseiBalance(formatRawBalance(raw, decimals));
+        }
+      }
     } finally {
       setLoading(false);
     }

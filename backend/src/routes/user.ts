@@ -141,12 +141,20 @@ function buildLocalSignalReply(message: string, connectedAddress?: string) {
 }
 
 function normalizeTokenItem(item: any) {
-  const symbol = String(item.symbol || item.tokenSymbol || item.tokenName || "TOKEN").toUpperCase();
+  const symbol = String(
+    item.symbol ||
+      item.tokenSymbol ||
+      item.TokenSymbol ||
+      item.tokenName ||
+      item.TokenName ||
+      "TOKEN"
+  ).toUpperCase();
   return {
     ...item,
     symbol,
     tokenSymbol: symbol,
-    tokenDecimal: item.tokenDecimal || item.decimals || "18",
+    tokenDecimal: String(item.tokenDecimal || item.TokenDecimals || item.decimals || "18"),
+    balance: String(item.balance || item.TokenQuantity || "0"),
   };
 }
 
