@@ -89,6 +89,7 @@ export default function ProfilePage() {
   const [history, setHistory] = useState<any[]>([]);
   const [nfts, setNfts] = useState<any[]>([]);
   const [arseiBalance, setArseiBalance] = useState("0");
+  const [nativeBalance, setNativeBalance] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchArseiBalance = useCallback(async () => {
@@ -111,10 +112,11 @@ export default function ProfilePage() {
     try {
       setLoading(true);
       const backendUrl = `${API_BASE}/api/user`;
-      const [historyRes, nftRes, tokenRes] = await Promise.allSettled([
+      const [historyRes, nftRes, tokenRes, nativeRes] = await Promise.allSettled([
         axios.get(`${backendUrl}/${address}/history`),
         axios.get(`${backendUrl}/${address}/nfts`),
         axios.get(`${backendUrl}/${address}/tokens`),
+        axios.get(`${backendUrl}/${address}/native-balance`),
       ]);
 
       if (historyRes.status === "fulfilled" && historyRes.value.data.success) setHistory(historyRes.value.data.data);
@@ -130,6 +132,9 @@ export default function ProfilePage() {
           const decimals = String(arsei.tokenDecimal || arsei.TokenDecimals || arsei.decimals || "18");
           setArseiBalance(formatRawBalance(raw, decimals));
         }
+      }
+      if (nativeRes.status === "fulfilled" && nativeRes.value.data.success) {
+        setNativeBalance(String(nativeRes.value.data.data?.formatted || null));
       }
     } finally {
       setLoading(false);
@@ -197,7 +202,7 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-[#8cf7e2]/10 bg-[#8cf7e2]/5 p-6">
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#8cf7e2]/60">Native Balance</p>
-                    <p className="text-4xl font-black text-white">{balance ?? "0.0000 ETH"}</p>
+                    <p className="text-4xl font-black text-white">{balance && balance !== "--- ETH" ? balance : nativeBalance ?? "0.0000 ETH"}</p>
                   </div>
                   
                   <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6 shadow-[0_0_20px_rgba(251,191,36,0.05)]">

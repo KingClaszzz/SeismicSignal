@@ -215,6 +215,35 @@ async function getExplorerTokenTxs(address: string) {
   return getExplorer(`${EXPLORER_API}?module=account&action=tokentx&address=${address}&sort=desc`);
 }
 
+async function fetchTransferLogsForToken(tokenAddress: `0x${string}`, walletAddress: `0x${string}`, fromBlock: bigint) {
+  const transferEvent = {
+    type: "event" as const,
+    name: "Transfer",
+    inputs: [
+      { indexed: true, name: "from", type: "address" },
+      { indexed: true, name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+  };
+
+  const [sentLogs, receivedLogs] = await Promise.all([
+    publicClient.getLogs({
+      address: tokenAddress,
+      event: transferEvent,
+      args: { from: walletAddress },
+      fromBlock,
+    }),
+    publicClient.getLogs({
+      address: tokenAddress,
+      event: transferEvent,
+      args: { to: walletAddress },
+      fromBlock,
+    }),
+  ]);
+
+  return [...sentLogs, ...receivedLogs];
+}
+
 router.get("/:address/history", walletDataLimiter, async (req, res) => {
   try {
     const { address } = req.params;
@@ -228,44 +257,51 @@ router.get("/:address/history", walletDataLimiter, async (req, res) => {
     ]);
 
     let txs: any[] = [];
-    let success = false;
 
     if (nativeRes.status === "fulfilled" && nativeRes.value.status === "1" && Array.isArray(nativeRes.value.result)) {
       txs = [...txs, ...nativeRes.value.result.map((tx: any) => ({ ...tx, tokenSymbol: "ETH", tokenDecimal: "18" }))];
-      success = true;
     }
 
     if (tokenRes.status === "fulfilled" && tokenRes.value.status === "1" && Array.isArray(tokenRes.value.result)) {
       txs = [...txs, ...getTokenItems(tokenRes.value.result)];
-      success = true;
     }
 
     if (txs.length === 0) {
       console.log(`[History] Explorer empty/failed for ${address}, falling back to RPC Logs...`);
       try {
-        const ARSEI = process.env.ARSEI_TOKEN_ADDRESS as `0x${string}`;
-        const WETH = process.env.SEISMIC_WETH_ADDRESS as `0x${string}`;
+        const walletAddress = address as `0x${string}`;
+        const ARSEI = process.env.ARSEI_TOKEN_ADDRESS as `0x${string}` | undefined;
+        const WETH = process.env.SEISMIC_WETH_ADDRESS as `0x${string}` | undefined;
 
         const currentBlock = await publicClient.getBlockNumber();
         const fromBlock = currentBlock > 90000n ? currentBlock - 90000n : 0n;
 
-        const [sentLogs, receivedLogs] = await Promise.all([
-          publicClient.getLogs({
-            event: { type: "event", name: "Transfer", inputs: [{ indexed: true, name: "from", type: "address" }, { indexed: true, name: "to", type: "address" }, { name: "value", type: "uint256" }] },
-            args: { from: address as `0x${string}` },
-            fromBlock
-          }),
-          publicClient.getLogs({
-            event: { type: "event", name: "Transfer", inputs: [{ indexed: true, name: "from", type: "address" }, { indexed: true, name: "to", type: "address" }, { name: "value", type: "uint256" }] },
-            args: { to: address as `0x${string}` },
-            fromBlock
-          })
-        ]);
+        const tokenCandidates = new Set<string>();
+        if (ARSEI) tokenCandidates.add(ARSEI.toLowerCase());
+        if (WETH) tokenCandidates.add(WETH.toLowerCase());
+        if (tokenRes.status === "fulfilled" && isExplorerSuccess(tokenRes.value)) {
+          for (const token of getTokenItems(asArrayResult(tokenRes.value))) {
+            const tokenAddress = String(token.TokenAddress || token.tokenAddress || token.contractAddress || "").toLowerCase();
+            if (isAddress(tokenAddress)) tokenCandidates.add(tokenAddress);
+          }
+        }
 
-        const combinedLogs = [...sentLogs, ...receivedLogs];
+        let combinedLogs: any[] = [];
+        for (const tokenAddress of tokenCandidates) {
+          try {
+            const logs = await fetchTransferLogsForToken(
+              tokenAddress as `0x${string}`,
+              walletAddress,
+              fromBlock
+            );
+            combinedLogs = [...combinedLogs, ...logs];
+          } catch (tokenLogErr) {
+            console.warn(`[History] Failed transfer log fetch for token ${tokenAddress}:`, tokenLogErr);
+          }
+        }
+
         const logTxs = await Promise.all(combinedLogs.map(async (log: any) => {
           const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-          const isSent = log.args.from?.toLowerCase() === address.toLowerCase();
           
           let symbol = "TOKEN";
           if (log.address.toLowerCase() === ARSEI?.toLowerCase()) symbol = "ARSEI";
@@ -283,7 +319,6 @@ router.get("/:address/history", walletDataLimiter, async (req, res) => {
           };
         }));
         txs = logTxs;
-        success = true;
       } catch (logErr) {
         console.error("RPC Fallback failed:", logErr);
       }
@@ -294,6 +329,27 @@ router.get("/:address/history", walletDataLimiter, async (req, res) => {
   } catch (error: any) {
     console.error("Failed to fetch Seismic history:", error.message);
     res.status(500).json({ success: false, message: "Failed to fetch transaction history." });
+  }
+});
+
+router.get("/:address/native-balance", walletDataLimiter, async (req, res) => {
+  try {
+    const { address } = req.params;
+    if (!isAddress(address)) {
+      return res.status(400).json({ success: false, message: "Invalid wallet address." });
+    }
+
+    const wei = await publicClient.getBalance({ address: address as `0x${string}` });
+    res.json({
+      success: true,
+      data: {
+        wei: wei.toString(),
+        formatted: `${Number(formatEther(wei)).toFixed(4)} ETH`,
+      },
+    });
+  } catch (error: any) {
+    console.error("Failed to fetch native balance:", error.message);
+    res.status(500).json({ success: false, message: "Failed to fetch native balance." });
   }
 });
 
