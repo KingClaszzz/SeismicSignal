@@ -215,6 +215,10 @@ async function getExplorerTokenTxs(address: string) {
   return getExplorer(`${EXPLORER_API}?module=account&action=tokentx&address=${address}&sort=desc`);
 }
 
+async function getExplorerNativeBalance(address: string) {
+  return getExplorer(`${EXPLORER_API}?module=account&action=balance&address=${address}`);
+}
+
 async function fetchTransferLogsForToken(tokenAddress: `0x${string}`, walletAddress: `0x${string}`, fromBlock: bigint) {
   const transferEvent = {
     type: "event" as const,
@@ -339,7 +343,23 @@ router.get("/:address/native-balance", walletDataLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid wallet address." });
     }
 
-    const wei = await publicClient.getBalance({ address: address as `0x${string}` });
+    let wei = 0n;
+    let balanceFound = false;
+
+    try {
+      wei = await publicClient.getBalance({ address: address as `0x${string}` });
+      balanceFound = true;
+    } catch (rpcError) {
+      console.warn(`[Native Balance] RPC failed for ${address}, falling back to SocialScan...`);
+    }
+
+    if (!balanceFound) {
+      const explorerRes = await getExplorerNativeBalance(address);
+      if (isExplorerSuccess(explorerRes) && explorerRes.result) {
+        wei = BigInt(explorerRes.result);
+      }
+    }
+
     res.json({
       success: true,
       data: {
