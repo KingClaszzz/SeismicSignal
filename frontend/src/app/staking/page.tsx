@@ -20,6 +20,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { parseEther, formatEther } from "viem";
@@ -58,6 +59,10 @@ const ERC20_ABI = [
 ] as const;
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:4000" : "https://arlor-seis.hf.space");
 
 interface PendingUnstake {
   amount: bigint;
@@ -120,7 +125,24 @@ export default function StakingPage() {
         setPendingRequests(requestsData as PendingUnstake[]);
       }
     } catch (err) {
-      console.error("Failed to fetch staking data:", err);
+      console.warn("RPC failed for staking data. Trying fallback for ARSEI balance...");
+      if (address) {
+        try {
+          const tokenRes = await axios.get(`${API_BASE}/api/user/${address}/tokens`);
+          if (tokenRes.data.success && Array.isArray(tokenRes.data.data)) {
+            const arsei = tokenRes.data.data.find((t: any) => (t.symbol || "").toUpperCase() === "ARSEI");
+            if (arsei) {
+               const decimals = Number(arsei.tokenDecimal || "18");
+               const raw = BigInt(arsei.balance || "0");
+               const divisor = BigInt(10) ** BigInt(decimals);
+               const whole = raw / divisor;
+               const fraction = raw % divisor;
+               const fractionStr = decimals > 0 ? fraction.toString().padStart(decimals, "0").slice(0, 4) : "0000";
+               setUserArseiBalance(`${whole}.${fractionStr}`);
+            }
+          }
+        } catch (fb) {}
+      }
     }
   }, [address, arseiAddress, isConfigured, publicClient, stakingAddress]);
 

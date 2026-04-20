@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRightLeft, ArrowDownUp, Waves, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { useIsMounted } from "@/hooks/useIsMounted";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { parseEther, formatEther } from "viem";
@@ -42,6 +43,10 @@ const ERC20_ABI = [
   { name: "balanceOf", type: "function", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
 ] as const;
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:4000" : "https://arlor-seis.hf.space");
+
 export default function SwapPage() {
   const { address, balance, isLoggedIn, prepareForConnect } = useWallet();
   const { isConnected, chain } = useAccount();
@@ -55,6 +60,7 @@ export default function SwapPage() {
   const [quotedOut, setQuotedOut] = useState("");
   const [quotedOutRaw, setQuotedOutRaw] = useState<bigint | null>(null);
   const [arseiBalance, setArseiBalance] = useState("0");
+  const [nativeBalance, setNativeBalance] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [txNotice, setTxNotice] = useState<string | null>(null);
@@ -73,7 +79,7 @@ export default function SwapPage() {
     hash,
   });
 
-  const fetchArseiBalance = useCallback(async () => {
+  const fetchBalances = useCallback(async () => {
     if (!publicClient || !address || arseiAddress === ZERO) return;
     try {
       const bal = await publicClient.readContract({
@@ -84,15 +90,37 @@ export default function SwapPage() {
       });
       setArseiBalance(formatEther(bal));
     } catch (e) {
-      console.error("Failed to fetch ARSEI balance:", e);
+      console.warn("RPC failed, fetching fallback balances...");
+      try {
+        const [tokenRes, nativeRes] = await Promise.allSettled([
+          axios.get(`${API_BASE}/api/user/${address}/tokens`),
+          axios.get(`${API_BASE}/api/user/${address}/native-balance`),
+        ]);
+
+        if (tokenRes.status === "fulfilled" && tokenRes.value.data.success && Array.isArray(tokenRes.value.data.data)) {
+          const arsei = tokenRes.value.data.data.find((t: any) => (t.symbol || "").toUpperCase() === "ARSEI");
+          if (arsei) {
+             const decimals = Number(arsei.tokenDecimal || "18");
+             const raw = BigInt(arsei.balance || "0");
+             const divisor = BigInt(10) ** BigInt(decimals);
+             const whole = raw / divisor;
+             const fraction = raw % divisor;
+             const fractionStr = decimals > 0 ? fraction.toString().padStart(decimals, "0").slice(0, 4) : "0000";
+             setArseiBalance(`${whole}.${fractionStr}`);
+          }
+        }
+        if (nativeRes.status === "fulfilled" && nativeRes.value.data.success) {
+          setNativeBalance(String(nativeRes.value.data.data?.formatted || null));
+        }
+      } catch (fb) {}
     }
   }, [address, arseiAddress, publicClient]);
 
   useEffect(() => {
     if (isLoggedIn && address && mounted) {
-      fetchArseiBalance();
+      fetchBalances();
     }
-  }, [address, fetchArseiBalance, isLoggedIn, mounted, isSuccess]);
+  }, [address, fetchBalances, isLoggedIn, mounted, isSuccess]);
 
   useEffect(() => {
     let ignore = false;
@@ -279,7 +307,7 @@ export default function SwapPage() {
             <div className="mb-8 grid grid-cols-2 gap-4">
               <div className="rounded-[1.4rem] border border-[var(--border-light)] bg-white/[0.03] p-4 text-center">
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-muted)]">Native Balance</p>
-                <p className="font-mono font-bold text-[var(--accent)]">{balance ?? "0.0000 ETH"}</p>
+                <p className="font-mono font-bold text-[var(--accent)]">{balance && balance !== "--- ETH" ? balance : nativeBalance ?? "0.0000 ETH"}</p>
               </div>
               <div className="rounded-[1.4rem] border border-[var(--border-light)] bg-white/[0.03] p-4 text-center">
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">ARSEI Balance</p>
