@@ -43,14 +43,25 @@ const TOKEN_CONFIG: Record<string, { color: string; bgSent: string; bgReceived: 
   },
 };
 
+const DEFAULT_TOKEN_CONFIG = {
+  color: "text-[var(--accent)]",
+  bgSent: "bg-red-500/10 text-red-400",
+  bgReceived: "bg-[var(--accent-soft)] text-[var(--accent)]",
+  label: "Token",
+};
+
 function formatAmount(tx: any): string {
-  const decimals = Number(tx.tokenDecimal ?? "18");
-  const raw = BigInt(tx.value ?? "0");
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const whole = raw / divisor;
-  const fraction = raw % divisor;
-  const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 4);
-  return `${whole}.${fractionStr}`;
+  try {
+    const decimals = Math.max(0, Number(tx.tokenDecimal ?? tx.decimals ?? "18"));
+    const raw = BigInt(tx.value ?? tx.balance ?? "0");
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const whole = raw / divisor;
+    const fraction = raw % divisor;
+    const fractionStr = decimals > 0 ? fraction.toString().padStart(decimals, "0").slice(0, 4) : "0000";
+    return `${whole}.${fractionStr}`;
+  } catch {
+    return "0.0000";
+  }
 }
 
 export default function ProfilePage() {
@@ -227,8 +238,8 @@ export default function ProfilePage() {
                 <div className="max-h-[700px] space-y-3 overflow-y-auto pr-1 text-slate-800">
                   {history.map((tx, index) => {
                     const isSent = tx.from?.toLowerCase() === address?.toLowerCase();
-                    const symbol = (tx.tokenSymbol || "ETH").toUpperCase();
-                    const cfg = TOKEN_CONFIG[symbol] ?? TOKEN_CONFIG.ETH;
+                    const symbol = (tx.tokenSymbol || tx.symbol || "ETH").toUpperCase();
+                    const cfg = TOKEN_CONFIG[symbol] ?? { ...DEFAULT_TOKEN_CONFIG, label: symbol };
                     const amount = formatAmount(tx);
 
                     return (

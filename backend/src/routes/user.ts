@@ -8,9 +8,10 @@ import { projects } from "../data/projects";
 const router = Router();
 
 const EXPLORER_URL = process.env.SEISMIC_EXPLORER_URL || "https://seismic-testnet.socialscan.io";
-const EXPLORER_API = process.env.SEISMIC_EXPLORER_API || `${EXPLORER_URL}/api`;
+const EXPLORER_API = process.env.SEISMIC_EXPLORER_API || "https://api.socialscan.io/seismic-testnet/v1/developer/api";
+const SOCIALSCAN_API_KEY = process.env.SOCIALSCAN_API_KEY || "";
 const SEISMIC_RPC_URL = process.env.SEISMIC_RPC_URL || "https://gcp-1.seismictest.net/rpc";
-const VERIFIED_TOKENS = (process.env.VERIFIED_TOKENS || "ETH,ARSEI,SUSD,WETH")
+const VERIFIED_TOKENS = (process.env.VERIFIED_TOKENS || "")
   .split(",")
   .map((token) => token.trim().toUpperCase())
   .filter(Boolean);
@@ -139,26 +140,55 @@ function buildLocalSignalReply(message: string, connectedAddress?: string) {
   );
 }
 
-function filterVerifiedTokens(items: any[] = []) {
-  return items.filter((item: any) => VERIFIED_TOKENS.includes(String(item.symbol || item.tokenSymbol || "").toUpperCase()));
+function normalizeTokenItem(item: any) {
+  const symbol = String(item.symbol || item.tokenSymbol || item.tokenName || "TOKEN").toUpperCase();
+  return {
+    ...item,
+    symbol,
+    tokenSymbol: symbol,
+    tokenDecimal: item.tokenDecimal || item.decimals || "18",
+  };
+}
+
+function getTokenItems(items: any[] = []) {
+  const normalized = items.map(normalizeTokenItem);
+
+  if (VERIFIED_TOKENS.length === 0) {
+    return normalized;
+  }
+
+  return normalized.filter((item: any) => VERIFIED_TOKENS.includes(String(item.symbol || item.tokenSymbol || "").toUpperCase()));
+}
+
+function withExplorerKey(url: string) {
+  if (!SOCIALSCAN_API_KEY) return url;
+  const joiner = url.includes("?") ? "&" : "?";
+  return `${url}${joiner}apikey=${encodeURIComponent(SOCIALSCAN_API_KEY)}`;
+}
+
+async function getExplorer(url: string) {
+  const response = await axios.get(withExplorerKey(url), {
+    timeout: 8000,
+    headers: SOCIALSCAN_API_KEY
+      ? {
+          "x-api-key": SOCIALSCAN_API_KEY,
+          Authorization: `Bearer ${SOCIALSCAN_API_KEY}`,
+        }
+      : undefined,
+  });
+  return response.data;
 }
 
 async function getExplorerTokenList(address: string) {
-  const url = `${EXPLORER_API}?module=account&action=tokenlist&address=${address}`;
-  const response = await axios.get(url, { timeout: 8000 });
-  return response.data;
+  return getExplorer(`${EXPLORER_API}?module=account&action=tokenlist&address=${address}`);
 }
 
 async function getExplorerNativeTxs(address: string) {
-  const url = `${EXPLORER_API}?module=account&action=txlist&address=${address}&sort=desc`;
-  const response = await axios.get(url, { timeout: 8000 });
-  return response.data;
+  return getExplorer(`${EXPLORER_API}?module=account&action=txlist&address=${address}&sort=desc`);
 }
 
 async function getExplorerTokenTxs(address: string) {
-  const url = `${EXPLORER_API}?module=account&action=tokentx&address=${address}&sort=desc`;
-  const response = await axios.get(url, { timeout: 8000 });
-  return response.data;
+  return getExplorer(`${EXPLORER_API}?module=account&action=tokentx&address=${address}&sort=desc`);
 }
 
 router.get("/:address/history", walletDataLimiter, async (req, res) => {
@@ -182,7 +212,7 @@ router.get("/:address/history", walletDataLimiter, async (req, res) => {
     }
 
     if (tokenRes.status === "fulfilled" && tokenRes.value.status === "1" && Array.isArray(tokenRes.value.result)) {
-      txs = [...txs, ...filterVerifiedTokens(tokenRes.value.result)];
+      txs = [...txs, ...getTokenItems(tokenRes.value.result)];
       success = true;
     }
 
@@ -273,7 +303,7 @@ router.get("/:address/tokens", walletDataLimiter, async (req, res) => {
     const response = await getExplorerTokenList(address);
 
     if (response.status === "1") {
-      res.json({ success: true, data: filterVerifiedTokens(response.result) });
+      res.json({ success: true, data: getTokenItems(response.result) });
       return;
     }
 
@@ -334,7 +364,7 @@ router.post("/agent/chat", chatLimiter, async (req, res) => {
         }
 
         if (tokenRes.status === "fulfilled" && tokenRes.value.status === "1") {
-          filterVerifiedTokens(tokenRes.value.result).forEach((token: any) => {
+          getTokenItems(tokenRes.value.result).forEach((token: any) => {
             const symbol = String(token.symbol || "").toUpperCase();
             const decimals = Number(token.decimals || 18);
             const amount = (Number(token.balance) / 10 ** decimals).toFixed(4);
@@ -347,7 +377,7 @@ router.post("/agent/chat", chatLimiter, async (req, res) => {
           combinedTxs = [...combinedTxs, ...nativeTxRes.value.result.map((tx: any) => ({ ...tx, tokenSymbol: "ETH", tokenDecimal: "18" }))];
         }
         if (tokenTxRes.status === "fulfilled" && tokenTxRes.value.status === "1" && Array.isArray(tokenTxRes.value.result)) {
-          combinedTxs = [...combinedTxs, ...filterVerifiedTokens(tokenTxRes.value.result)];
+          combinedTxs = [...combinedTxs, ...getTokenItems(tokenTxRes.value.result)];
         }
 
         const recentTxs: string[] = [];

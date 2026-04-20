@@ -23,7 +23,8 @@ Required secrets and variables in the Hugging Face Space settings:
 - `SEISMIC_RPC_URL`
 - `SEISMIC_EXPLORER_URL`
 - `SEISMIC_EXPLORER_API`
-- `VERIFIED_TOKENS`
+- `SOCIALSCAN_API_KEY`
+- `VERIFIED_TOKENS` optional comma-separated symbol allowlist. Leave empty to show every indexed token activity.
 - `HUGGINGFACE_API_KEY`
 - `HUGGINGFACE_MODEL`
 - `ARSEI_TOKEN_ADDRESS`
