@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useWallet } from "@/hooks/useWallet";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { motion } from "framer-motion";
@@ -30,19 +31,19 @@ export function Navbar() {
     <nav className="fixed left-1/2 top-6 z-50 w-[95%] max-w-7xl -translate-x-1/2">
       <div className="glass-card flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-10">
-          <a href="/" className="group flex items-center gap-3">
+          <Link href="/" className="group flex items-center gap-3">
             <BrandMark className="h-10 w-10 rounded-[1rem] transition-transform group-hover:rotate-3" />
             <div>
               <p className="text-lg font-black text-[var(--text-primary)]">Seismic Signal</p>
               <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--text-muted)]">Explorer Layer</p>
             </div>
-          </a>
+          </Link>
 
           <div className="hidden items-center gap-7 lg:flex">
             {navItems.map((item) => (
-              <a key={item.label} href={item.href} className="nav-link">
+              <Link key={item.label} href={item.href} className="nav-link">
                 {item.label}
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -96,14 +97,14 @@ export function Navbar() {
       {isMenuOpen && (
         <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="glass-card mt-3 flex flex-col gap-3 p-5 lg:hidden">
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className="rounded-2xl border border-transparent px-4 py-3 text-base font-semibold text-[var(--text-primary)] transition-all hover:border-[var(--border-light)] hover:bg-white/[0.03]"
               onClick={() => setIsMenuOpen(false)}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
           <a href="https://faucet.seismictest.net/" target="_blank" rel="noreferrer" className="btn-secondary text-center">
             Seismic Faucet

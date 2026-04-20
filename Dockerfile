@@ -15,8 +15,6 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma gene
 
 RUN npm run build
 
-RUN npm prune --omit=dev
-
 EXPOSE 7860
 ENV NODE_ENV=production
 ENV PORT=7860
