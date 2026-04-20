@@ -34,3 +34,5 @@ Notes:
 - This Space is intended to be used with an external Postgres database such as Neon.
 - Session cookies depend on the frontend origin being set correctly in `FRONTEND_URL`.
 - The backend listens on port `7860`, which matches Hugging Face Docker Spaces expectations.
+
+Build by arlor
