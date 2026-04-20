@@ -1,0 +1,7 @@
+{
+  "name": "seismic-signal",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm run build"
+  }
+}

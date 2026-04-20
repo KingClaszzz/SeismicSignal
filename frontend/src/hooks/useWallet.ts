@@ -49,7 +49,7 @@ export function useWallet() {
   const { data: balance, error: balanceError } = useBalance({
     address,
     query: { 
-      enabled: !!address,
+      enabled: !!address && !!sessionAddress,
       retry: 1,
     },
   });
@@ -170,6 +170,7 @@ export function useWallet() {
   }, [isConnected, address, isAuthFetched, sessionMatchesWallet, wagmiDisconnect, login]);
 
   const isWrongNetwork = isConnected && chainId !== seismicTestnet.id;
+  const hasWalletAccess = !!address && isConnected && !getManualDisconnectFlag();
 
   const shortAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -198,9 +199,9 @@ export function useWallet() {
     prepareForConnect,
     disconnect: logout,
     connectors,
-    user: sessionMatchesWallet ? { address } : null,
+    user: hasWalletAccess ? { address } : null,
     login,
-    isLoggedIn: sessionMatchesWallet,
+    isLoggedIn: hasWalletAccess,
     isAdmin,
   };
 }

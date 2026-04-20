@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://arlor-seis.hf.space") + "/api";
 
 let csrfTokenPromise: Promise<string | null> | null = null;
 let currentCsrfToken: string | null = null;

@@ -1,6 +1,6 @@
 import { ApiResponse, Project } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "https://arlor-seis.hf.space";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { 
