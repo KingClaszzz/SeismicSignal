@@ -12,7 +12,7 @@ import { ProjectGrid } from "@/components/ProjectGrid";
 import { Footer } from "@/components/Footer";
 
 export default function Home() {
-  const { isLoggedIn } = useWallet();
+  const { isConnected } = useWallet();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function Home() {
     <main className="relative z-10">
       <Navbar />
 
-      {!isLoggedIn ? (
+      {!isConnected ? (
         <>
           <LandingHero />
           <LandingFeatures />
