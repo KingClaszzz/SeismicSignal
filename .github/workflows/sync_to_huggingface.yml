@@ -1,0 +1,38 @@
+name: Sync to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          
+          # We use git subtree to push only the backend folder
+          # Replace 'username/space-name' with your actual HF Space details
+          # or use a secret for the URL
+          
+          # To make it dynamic, we can use a secret: HF_SPACE_URL
+          # which should be like: https://x-token:${HF_TOKEN}@huggingface.co/spaces/Arlor/seis
+          
+          # However, a cleaner way is to push to a remote
+          git remote add hf https://user-name:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/Arlor/seis
+          
+          # Use force push since we are pushing a subtree
+          # Note: Replace user-name/space-name above with your actual Space ID
+          git subtree push --prefix backend hf main
